@@ -348,7 +348,6 @@ void retro_run(void)
          for (unsigned x = 0; x < width; x++)
          {
             uint32_t p = row[x];
-            // Swap Red and Blue in 32-bit (ARGB / ABGR format adjustment)
             uint32_t a = p & 0xFF000000;
             uint32_t r = (p & 0x00FF0000) >> 16;
             uint32_t g = (p & 0x0000FF00);
@@ -371,10 +370,14 @@ void retro_run(void)
          for (unsigned x = 0; x < width; x++)
          {
             uint16_t p = row[x];
-            uint16_t r = (p & 0xF800) >> 11;
-            uint16_t g = ((p & 0x07E0) >> 1) & 0x03E0;
-            uint16_t b = (p & 0x001F) << 10;
-            row[x] = 0x8000 | b | g | r;
+            // Fully explicit RGB565 -> ABGR1555 channel extraction and inversion
+            uint16_t r = (p >> 11) & 0x1F;
+            uint16_t g = (p >>  5) & 0x3F; // retains 6-bit green precision temporarily
+            uint16_t b = (p      ) & 0x1F;
+            
+            // Map down green to 5 bits (0x1F) and pack into 1-5-5-5 format with alpha bit set
+            g = (g >> 1) & 0x1F;
+            row[x] = (1 << 15) | (b << 10) | (g << 5) | r;
          }
       }
    }
