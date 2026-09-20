@@ -14,13 +14,13 @@ endif
 ifneq ($(platform),ps2)
   c     := $(compiler)
   cpp   := $(subst cc,++,$(compiler))
-  flags := -O3 -fomit-frame-pointer -Ilib
+  flags := -O3 -fomit-frame-pointer -Ilib -Wno-error=overloaded-virtual
   link  :=
 else
   # PlayStation 2 (EE) Toolchain Settings
   c     := ee-gcc
   cpp   := ee-g++
-  flags := -O3 -G0 -fomit-frame-pointer -Ilib -I$(PS2SDK)/common/include -I$(PS2SDK)/ee/include -I$(PS2SDK)/ports/include
+  flags := -O3 -G0 -fomit-frame-pointer -Ilib -I$(PS2SDK)/common/include -I$(PS2SDK)/ee/include -I$(PS2SDK)/ports/include -Wno-error=overloaded-virtual
   link  := -L$(PS2SDK)/ee/lib -L$(PS2SDK)/ports/lib -lkernel
 endif
 
@@ -210,7 +210,6 @@ ifeq ($(platform),osx)
     $(strip$(cpp) -o ../bsnes.app/Contents/MacOS/bsnes $(objects)$(link))
 else ifeq ($(platform),ps2)
     $(strip$(cpp) -o ../bsnes.elf $(objects)$(link))
-    # Optional: generate ELF stripped or packed binary if desired
 else
     $(strip$(cpp) -o ../bsnes $(objects)$(link))
 endif
