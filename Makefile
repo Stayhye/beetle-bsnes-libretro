@@ -357,10 +357,10 @@ else
 endif
 
 %.o: %.cpp
-	$(CXX) -c -o$@ $<$(CXXFLAGS)
+	$(CXX)$(CXXFLAGS) -c -o $@ $<
 
 %.o: %.c
-	$(CC) -c -o$@ $<$(CFLAGS)
+	$(CC)$(CFLAGS) -c -o $@ $<
 
 clean:
 	rm -f $(TARGET)$(OBJECTS)
