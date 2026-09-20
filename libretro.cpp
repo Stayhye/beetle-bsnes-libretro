@@ -338,7 +338,6 @@ void retro_run(void)
 
 #if defined(WANT_32BPP)
    uint32_t *pix = (uint32_t *)surf->pixels;
-
    if (pix && width && height)
    {
       int row_pixels = (FB_WIDTH << 2) / sizeof(uint32_t);
@@ -355,13 +354,13 @@ void retro_run(void)
             row[x] = a | b | g | r;
          }
       }
+      video_cb(pix, width, height, FB_WIDTH << 2);
    }
-
-   video_cb(pix, width, height, FB_WIDTH << 2);
 #elif defined(WANT_16BPP)
-   uint16_t *pix = surf->pixels16;
+   uint16_t *pix = surf ? (uint16_t *)surf->pixels16 : NULL;
    
-   if (pix && width && height)
+   // Guard against unallocated surfaces on startup frames
+   if (pix && width > 0 && height > 0)
    {
       int row_pixels = (FB_WIDTH << 1) / sizeof(uint16_t);
       for (unsigned y = 0; y < height; y++)
@@ -370,19 +369,15 @@ void retro_run(void)
          for (unsigned x = 0; x < width; x++)
          {
             uint16_t p = row[x];
-            // Fully explicit RGB565 -> ABGR1555 channel extraction and inversion
             uint16_t r = (p >> 11) & 0x1F;
-            uint16_t g = (p >>  5) & 0x3F; // retains 6-bit green precision temporarily
+            uint16_t g = (p >>  5) & 0x3F;
             uint16_t b = (p      ) & 0x1F;
-            
-            // Map down green to 5 bits (0x1F) and pack into 1-5-5-5 format with alpha bit set
             g = (g >> 1) & 0x1F;
             row[x] = (1 << 15) | (b << 10) | (g << 5) | r;
          }
       }
+      video_cb(pix, width, height, FB_WIDTH << 1);
    }
-
-   video_cb(pix, width, height, FB_WIDTH << 1);
 #endif
 
    video_frames++;
