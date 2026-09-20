@@ -6,19 +6,19 @@
 //note: bus conflict delays are not emulated at this time
 
 void SA1::op_io() {
-  tick();
+    tick();
 }
 
-uint8 SA1::op_read(unsigned addr) {
-  tick();
-  if(((addr & 0x40e000) == 0x006000) || ((addr & 0xd00000) == 0x400000)) tick();
-  return sa1bus.read(addr);
+uint8_t SA1::op_read(uint32_t addr) {
+    tick();
+    if(((addr & 0x40e000) == 0x006000) || ((addr & 0xd00000) == 0x400000)) tick();
+    return sa1bus.read(addr);
 }
 
-void SA1::op_write(unsigned addr, uint8 data) {
-  tick();
-  if(((addr & 0x40e000) == 0x006000) || ((addr & 0xd00000) == 0x400000)) tick();
-  sa1bus.write(addr, data);
+void SA1::op_write(uint32_t addr, uint8_t data) {
+    tick();
+    if(((addr & 0x40e000) == 0x006000) || ((addr & 0xd00000) == 0x400000)) tick();
+    sa1bus.write(addr, data);
 }
 
 #endif
