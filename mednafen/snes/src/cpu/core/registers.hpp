@@ -2,13 +2,23 @@ struct flag_t {
   bool n, v, m, x, d, i, z, c;
 
   inline operator unsigned() const {
-    return (n << 7) + (v << 6) + (m << 5) + (x << 4)
-         + (d << 3) + (i << 2) + (z << 1) + (c << 0);
+    // Optimized packing using bitwise ORs to let the compiler generate parallel shifts
+    return ((unsigned)n << 7) | ((unsigned)v << 6) | 
+           ((unsigned)m << 5) | ((unsigned)x << 4) |
+           ((unsigned)d << 3) | ((unsigned)i << 2) | 
+           ((unsigned)z << 1) | (unsigned)c;
   }
 
   inline unsigned assign(uint8 data) {
-    n = data & 0x80; v = data & 0x40; m = data & 0x20; x = data & 0x10;
-    d = data & 0x08; i = data & 0x04; z = data & 0x02; c = data & 0x01;
+    // Use direct bitwise extraction without slow conditional branching
+    n = (data & 0x80);
+    v = (data & 0x40);
+    m = (data & 0x20);
+    x = (data & 0x10);
+    d = (data & 0x08);
+    i = (data & 0x04);
+    z = (data & 0x02);
+    c = (data & 0x01);
     return data;
   }
 
@@ -27,15 +37,15 @@ struct reg16_t {
   };
 
   inline operator unsigned() const { return w; }
-  inline unsigned operator   = (unsigned i) { return w   = i; }
-  inline unsigned operator  |= (unsigned i) { return w  |= i; }
-  inline unsigned operator  ^= (unsigned i) { return w  ^= i; }
-  inline unsigned operator  &= (unsigned i) { return w  &= i; }
-  inline unsigned operator <<= (unsigned i) { return w <<= i; }
+  inline unsigned operator   = (unsigned i) { return w   = (uint16)i; }
+  inline unsigned operator  |= (unsigned i) { return w  |= (uint16)i; }
+  inline unsigned operator  ^= (unsigned i) { return w  ^= (uint16)i; }
+  inline unsigned operator  &= (unsigned i) { return w  &= (uint16)i; }
+  inline unsigned operator <<= (unsigned i) { return w  = (uint16)(w << i); }
   inline unsigned operator >>= (unsigned i) { return w >>= i; }
-  inline unsigned operator  += (unsigned i) { return w  += i; }
-  inline unsigned operator  -= (unsigned i) { return w  -= i; }
-  inline unsigned operator  *= (unsigned i) { return w  *= i; }
+  inline unsigned operator  += (unsigned i) { return w  = (uint16)(w  + i); }
+  inline unsigned operator  -= (unsigned i) { return w  = (uint16)(w  - i); }
+  inline unsigned operator  *= (unsigned i) { return w  = (uint16)(w  * i); }
   inline unsigned operator  /= (unsigned i) { return w  /= i; }
   inline unsigned operator  %= (unsigned i) { return w  %= i; }
 
@@ -50,17 +60,19 @@ struct reg24_t {
   };
 
   inline operator unsigned() const { return d; }
-  inline unsigned operator   = (unsigned i) { return d = uclip<24>(i); }
-  inline unsigned operator  |= (unsigned i) { return d = uclip<24>(d  | i); }
-  inline unsigned operator  ^= (unsigned i) { return d = uclip<24>(d  ^ i); }
-  inline unsigned operator  &= (unsigned i) { return d = uclip<24>(d  & i); }
-  inline unsigned operator <<= (unsigned i) { return d = uclip<24>(d << i); }
-  inline unsigned operator >>= (unsigned i) { return d = uclip<24>(d >> i); }
-  inline unsigned operator  += (unsigned i) { return d = uclip<24>(d  + i); }
-  inline unsigned operator  -= (unsigned i) { return d = uclip<24>(d  - i); }
-  inline unsigned operator  *= (unsigned i) { return d = uclip<24>(d  * i); }
-  inline unsigned operator  /= (unsigned i) { return d = uclip<24>(d  / i); }
-  inline unsigned operator  %= (unsigned i) { return d = uclip<24>(d  % i); }
+  
+  // Replaced heavy template uclip with direct 24-bit masking for cleaner MIPS asm generation
+  inline unsigned operator   = (unsigned i) { return d = i & 0xffffff; }
+  inline unsigned operator  |= (unsigned i) { return d = (d  | i) & 0xffffff; }
+  inline unsigned operator  ^= (unsigned i) { return d = (d  ^ i) & 0xffffff; }
+  inline unsigned operator  &= (unsigned i) { return d = (d  & i) & 0xffffff; }
+  inline unsigned operator <<= (unsigned i) { return d = (d << i) & 0xffffff; }
+  inline unsigned operator >>= (unsigned i) { return d = (d >> i) & 0xffffff; }
+  inline unsigned operator  += (unsigned i) { return d = (d  + i) & 0xffffff; }
+  inline unsigned operator  -= (unsigned i) { return d = (d  - i) & 0xffffff; }
+  inline unsigned operator  *= (unsigned i) { return d = (d  * i) & 0xffffff; }
+  inline unsigned operator  /= (unsigned i) { return d = (d  / i) & 0xffffff; }
+  inline unsigned operator  %= (unsigned i) { return d = (d  % i) & 0xffffff; }
 
   reg24_t() : d(0) {}
 };
@@ -72,9 +84,9 @@ struct regs_t {
   uint8 db;
   bool e;
 
-  bool irq;   //IRQ pin (0 = low, 1 = trigger)
-  bool wai;   //raised during wai, cleared after interrupt triggered
-  uint8 mdr;  //memory data register
+  bool irq;   // IRQ pin (0 = low, 1 = trigger)
+  bool wai;   // raised during wai, cleared after interrupt triggered
+  uint8 mdr;  // memory data register
 
   regs_t() : a(r[0]), x(r[1]), y(r[2]), z(r[3]), s(r[4]), d(r[5]), db(0), e(false), irq(false), wai(false), mdr(0) {
     z = 0;
