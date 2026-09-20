@@ -338,6 +338,7 @@ void retro_run(void)
 
 #if defined(WANT_32BPP)
    uint32_t *pix = (uint32_t *)surf->pixels;
+
    if (pix && width && height)
    {
       int row_pixels = (FB_WIDTH << 2) / sizeof(uint32_t);
@@ -347,6 +348,7 @@ void retro_run(void)
          for (unsigned x = 0; x < width; x++)
          {
             uint32_t p = row[x];
+            // Swap Red and Blue in 32-bit (ARGB / ABGR format adjustment)
             uint32_t a = p & 0xFF000000;
             uint32_t r = (p & 0x00FF0000) >> 16;
             uint32_t g = (p & 0x0000FF00);
@@ -354,13 +356,13 @@ void retro_run(void)
             row[x] = a | b | g | r;
          }
       }
-      video_cb(pix, width, height, FB_WIDTH << 2);
    }
+
+   video_cb(pix, width, height, FB_WIDTH << 2);
 #elif defined(WANT_16BPP)
-   uint16_t *pix = surf ? (uint16_t *)surf->pixels16 : NULL;
+   uint16_t *pix = surf->pixels16;
    
-   // Guard against unallocated surfaces on startup frames
-   if (pix && width > 0 && height > 0)
+   if (pix && width && height)
    {
       int row_pixels = (FB_WIDTH << 1) / sizeof(uint16_t);
       for (unsigned y = 0; y < height; y++)
@@ -369,15 +371,15 @@ void retro_run(void)
          for (unsigned x = 0; x < width; x++)
          {
             uint16_t p = row[x];
-            uint16_t r = (p >> 11) & 0x1F;
-            uint16_t g = (p >>  5) & 0x3F;
-            uint16_t b = (p      ) & 0x1F;
-            g = (g >> 1) & 0x1F;
-            row[x] = (1 << 15) | (b << 10) | (g << 5) | r;
+            uint16_t r = (p & 0xF800) >> 11;
+            uint16_t g = ((p & 0x07E0) >> 1) & 0x03E0;
+            uint16_t b = (p & 0x001F) << 10;
+            row[x] = 0x8000 | b | g | r;
          }
       }
-      video_cb(pix, width, height, FB_WIDTH << 1);
    }
+
+   video_cb(pix, width, height, FB_WIDTH << 1);
 #endif
 
    video_frames++;
