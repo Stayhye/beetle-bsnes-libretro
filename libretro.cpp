@@ -78,33 +78,34 @@ static void check_system_specs(void)
    environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
 }
 
+static inline void sanitize_path(std::string &path)
+{
+   if (path.empty())
+      return;
+   size_t last = path.find_last_not_of("/\\");
+   if (last != std::string::npos)
+      path.erase(last + 1);
+   else
+      path.clear();
+}
+
 void retro_init(void)
 {
    struct retro_log_callback log;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
-      log_cb = log.log;
-   else 
-      log_cb = NULL;
+   log_cb = environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log) ? log.log : NULL;
 
    MDFNI_InitializeModule();
 
    const char *dir = NULL;
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir)
+   if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &dir) && dir && *dir)
    {
       retro_base_directory = dir;
-      // Make sure that we don't have any lingering slashes, etc, as they break Windows.
-      size_t last = retro_base_directory.find_last_not_of("/\\");
-      if (last != std::string::npos)
-         last++;
-
-      retro_base_directory = retro_base_directory.substr(0, last);
-
+      sanitize_path(retro_base_directory);
       MDFNI_Initialize(retro_base_directory.c_str());
    }
    else
    {
-      /* TODO: Add proper fallback */
       if (log_cb)
          log_cb(RETRO_LOG_WARN, "System directory is not defined. Fallback on using same dir as ROM for system directory later ...\n");
       failed_init = true;
@@ -112,22 +113,15 @@ void retro_init(void)
    
    if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &dir) && dir)
    {
-	  // If save directory is defined use it, otherwise use system directory
-      retro_save_directory = *dir ? dir : retro_base_directory;
-      // Make sure that we don't have any lingering slashes, etc, as they break Windows.
-      size_t last = retro_save_directory.find_last_not_of("/\\");
-      if (last != std::string::npos)
-         last++;
-
-      retro_save_directory = retro_save_directory.substr(0, last);      
+      retro_save_directory = (*dir) ? dir : retro_base_directory;
+      sanitize_path(retro_save_directory);
    }
    else
    {
-      /* TODO: Add proper fallback */
       if (log_cb)
          log_cb(RETRO_LOG_WARN, "Save directory is not defined. Fallback on using SYSTEM directory ...\n");
-	  retro_save_directory = retro_base_directory;
-   }      
+      retro_save_directory = retro_base_directory;
+   }
 
 #if defined(WANT_16BPP) && defined(FRONTEND_SUPPORTS_RGB565)
    enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
@@ -135,10 +129,7 @@ void retro_init(void)
       log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
 #endif
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb))
-      perf_get_cpu_features_cb = perf_cb.get_cpu_features;
-   else
-      perf_get_cpu_features_cb = NULL;
+   perf_get_cpu_features_cb = environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf_cb) ? perf_cb.get_cpu_features : NULL;
 
    check_system_specs();
 }
