@@ -30,7 +30,7 @@ CORE_DEFINE := -DWANT_SNES_EMU
 TARGET_NAME := mednafen_snes
 GIT_VERSION := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 ifneq ($(GIT_VERSION),unknown)
-    CXXFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
+    EXTRA_CXXFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 endif
 
 ifeq ($(platform), unix)
@@ -46,12 +46,6 @@ ifeq ($(platform), unix)
     LDFLAGS += -ldl
     endif
 
-# Classic Platforms ####################
-# Platform affix = classic_<ISA>_<µARCH>
-# Help at https://modmyclassic.com/comp
-
-# (armv7 a7, hard point, neon based) ### 
-# NESC, SNESC, C64 mini 
 else ifeq ($(platform), classic_armv7_a7)
     TARGET := $(TARGET_NAME)_libretro.so
     fpic := -fPIC
@@ -68,18 +62,7 @@ else ifeq ($(platform), classic_armv7_a7)
     HAVE_NEON = 1
     ARCH = arm
     LDFLAGS += -ldl
-    ifeq ($(shell echo `$(CC) -dumpversion` "< 4.9" | bc -l), 1)
-      CFLAGS += -march=armv7-a
-    else
-      CFLAGS += -march=armv7ve
-      # If gcc is 5.0 or later
-      ifeq ($(shell echo `$(CC) -dumpversion` ">= 5" | bc -l), 1)
-        LDFLAGS += -static-libgcc -static-libstdc++
-      endif
-    endif
 
-# (armv8 a35, hard point, neon based) ###
-# PlayStation Classic
 else ifeq ($(platform), classic_armv8_a35)
     TARGET := $(TARGET_NAME)_libretro.so
     fpic := -fPIC
@@ -98,125 +81,24 @@ else ifeq ($(platform), classic_armv8_a35)
     LDFLAGS += -ldl
     CFLAGS += -march=armv8-a
     LDFLAGS += -static-libgcc -static-libstdc++
-#######################################
 
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
-   MINVERSION :=
-ifeq ($(arch),ppc)
-   ENDIANNESS_DEFINES := -DMSB_FIRST
-   OLD_GCC := 1
-endif
-   OSXVER = `sw_vers -productVersion | cut -d. -f 2`
-   OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
-   ifeq ($(OSX_LT_MAVERICKS),"YES")
-      MINVERSION = -mmacosx-version-min=10.1
-   else
-      fpic += -stdlib=libc++
-   endif
-   fpic += $(MINVERSION)
-   fpic += -DHAVE_POSIX_MEMALIGN=1
 
-   ifeq ($(CROSS_COMPILE),1)
-        TARGET_RULE  = -target $(LIBRETRO_APPLE_PLATFORM) -isysroot$(LIBRETRO_APPLE_ISYSROOT)
-        CFLAGS   += $(TARGET_RULE)
-        CPPFLAGS += $(TARGET_RULE)
-        CXXFLAGS += $(TARGET_RULE)
-        LDFLAGS  += $(TARGET_RULE)
-   endif
-
-   CFLAGS  += $(ARCHFLAGS)
-   CXXFLAGS  += $(ARCHFLAGS)
-   LDFLAGS += $(ARCHFLAGS)
-
-# iOS
 else ifneq (,$(findstring ios,$(platform)))
-
    TARGET := $(TARGET_NAME)_libretro_ios.dylib
    fpic := -fPIC -DHAVE_POSIX_MEMALIGN=1
    SHARED := -dynamiclib
    CFLAGS += -DIOS
-ifeq ($(IOSSDK),)
-   IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
-endif
-   ifeq ($(platform), ios-arm64)
-      CC = cc -arch arm64 -isysroot $(IOSSDK)
-      CXX = c++ -arch arm64 -isysroot $(IOSSDK)
-   else
-      CC = cc -arch armv7 -isysroot $(IOSSDK)
-      CXX = c++ -arch armv7 -isysroot $(IOSSDK)
-   endif
-IPHONEMINVER :=
-ifeq ($(platform),$(filter$(platform),ios9 ios-arm64))
-    IPHONEMINVER = -miphoneos-version-min=8.0
-else
-    IPHONEMINVER = -miphoneos-version-min=5.0
-endif
-   LDFLAGS += $(IPHONEMINVER)
-   FLAGS += $(IPHONEMINVER)
 
 else ifeq ($(platform), tvos-arm64)
    EXT?=dylib
    TARGET := $(TARGET_NAME)_libretro_tvos.$(EXT)
    fpic := -fPIC -DHAVE_POSIX_MEMALIGN=1
    SHARED := -dynamiclib
-   DEFINES := -DIOS
-   CFLAGS += -DIOS
-ifeq ($(IOSSDK),)
-   IOSSDK := $(shell xcodebuild -version -sdk appletvos Path)
-endif
-   CC = cc -arch arm64 -isysroot $(IOSSDK)
-   CXX = c++ -arch arm64 -isysroot $(IOSSDK)
-   MINVER = -mappletvos-version-min=11.0
-   LDFLAGS += $(MINVER)
-   FLAGS += $(MINVER)
-   CC += $(MINVER)
-   CXX += $(MINVER)
 
-else ifeq ($(platform), qnx)
-   TARGET := $(TARGET_NAME)_libretro_$(platform).so
-   fpic := -fPIC
-   SHARED := -lcpp -lm -shared -Wl,--no-undefined -Wl,--version-script=link.T
-   CC = qcc -Vgcc_ntoarmv7le
-   CXX = QCC -Vgcc_ntoarmv7le_cpp
-   AR = QCC -Vgcc_ntoarmv7le
-   FLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
-else ifeq ($(platform), ps3)
-   TARGET := $(TARGET_NAME)_libretro_$(platform).a
-   CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
-   CXX = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-g++.exe
-   AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
-   ENDIANNESS_DEFINES := -DMSB_FIRST
-   OLD_GCC := 1
-   FLAGS += -DARCH_POWERPC_ALTIVEC
-   STATIC_LINKING = 1
-else ifeq ($(platform), sncps3)
-   TARGET := $(TARGET_NAME)_libretro_ps3.a
-   CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
-   CXX = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
-   AR = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
-   ENDIANNESS_DEFINES := -DMSB_FIRST
-   CXXFLAGS += -Xc+=exceptions
-   OLD_GCC := 1
-   NO_GCC := 1
-   FLAGS += -DARCH_POWERPC_ALTIVEC
-   STATIC_LINKING = 1
-else ifeq ($(platform), psl1ght)
-   TARGET := $(TARGET_NAME)_libretro_$(platform).a
-   CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
-   CXX = $(PS3DEV)/ppu/bin/ppu-g++$(EXE_EXT)
-   AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
-   ENDIANNESS_DEFINES := -DMSB_FIRST
-   STATIC_LINKING = 1
-else ifeq ($(platform), psp1)
-   TARGET := $(TARGET_NAME)_libretro_$(platform).a
-   CC = psp-gcc$(EXE_EXT)
-   CXX = psp-g++$(EXE_EXT)
-   AR = psp-ar$(EXE_EXT)
-   FLAGS += -DPSP -G0
-   STATIC_LINKING = 1
 # PS2
 else ifeq ($(platform), ps2)
     TARGET := $(TARGET_NAME)_libretro_$(platform).a
@@ -230,81 +112,6 @@ else ifeq ($(platform), ps2)
     STATIC_LINKING_LINK = 1
     PLATFORM_DEFINES := -DPS2 -DVIDEO_ABGR1555 -DIOAPI_NO_64
     FRONTEND_SUPPORTS_RGB565 = 0
-else ifeq ($(platform), xenon)
-   TARGET := $(TARGET_NAME)_libretro_xenon360.a
-   CC = xenon-gcc$(EXE_EXT)
-   CXX = xenon-g++$(EXE_EXT)
-   AR = xenon-ar$(EXE_EXT)
-   ENDIANNESS_DEFINES += -D__LIBXENON__ -m32 -D__ppc__ -DMSB_FIRST
-   LIBS := 
-   STATIC_LINKING = 1
-else ifeq ($(platform), ngc)
-   TARGET := $(TARGET_NAME)_libretro_$(platform).a
-   CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
-   CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
-   AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   ENDIANNESS_DEFINES += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST
-
-   EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
-   STATIC_LINKING = 1
-else ifeq ($(platform), wii)
-   TARGET := $(TARGET_NAME)_libretro_$(platform).a
-   CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
-   CXX = $(DEVKITPPC)/bin/powerpc-eabi-g++$(EXE_EXT)
-   AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   ENDIANNESS_DEFINES += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST
-
-   EXTRA_INCLUDES := -I$(DEVKITPRO)/libogc/include
-   STATIC_LINKING = 1
-else ifneq (,$(findstring armv,$(platform)))
-   TARGET := $(TARGET_NAME)_libretro.so
-   fpic := -fPIC
-   SHARED := -shared -Wl,--no-undefined -Wl,--version-script=link.T
-   CC = gcc
-   IS_X86 = 0
-ifneq (,$(findstring cortexa8,$(platform)))
-   FLAGS += -marm -mcpu=cortex-a8
-   ASFLAGS += -mcpu=cortex-a8
-else ifneq (,$(findstring cortexa9,$(platform)))
-   FLAGS += -marm -mcpu=cortex-a9
-   ASFLAGS += -mcpu=cortex-a9
-endif
-   FLAGS += -marm
-ifneq (,$(findstring neon,$(platform)))
-   FLAGS += -mfpu=neon
-   ASFLAGS += -mfpu=neon
-   HAVE_NEON = 1
-endif
-ifneq (,$(findstring softfloat,$(platform)))
-   FLAGS += -mfloat-abi=softfp
-else ifneq (,$(findstring hardfloat,$(platform)))
-   FLAGS += -mfloat-abi=hard
-endif
-   FLAGS += -DARM
-else ifeq ($(platform), emscripten)
-   TARGET := $(TARGET_NAME)_libretro_$(platform).bc
-   STATIC_LINKING = 1
-
-# Windows MSVC 2003 x86
-else ifeq ($(platform), windows_msvc2003_x86)
-    CC  = cl.exe
-    CXX = cl.exe
-
-PATH := $(shell IFS=$$'\n'; cygpath "$(VS71COMNTOOLS)../../Vc7/bin"):$(PATH)
-PATH := $(PATH):$(shell IFS=$$'\n'; cygpath "$(VS71COMNTOOLS)../IDE")
-INCLUDE := $(shell IFS=$$'\n'; cygpath "$(VS71COMNTOOLS)../../Vc7/include")
-LIB := $(shell IFS=$$'\n'; cygpath -w "$(VS71COMNTOOLS)../../Vc7/lib")
-BIN := $(shell IFS=$$'\n'; cygpath "$(VS71COMNTOOLS)../../Vc7/bin")
-
-WindowsSdkDir := $(INETSDK)
-
-export INCLUDE := $(INCLUDE);$(INETSDK)/Include;libretro-common/include/compat/msvc
-export LIB := $(LIB);$(WindowsSdkDir);$(INETSDK)/Lib
-TARGET := $(TARGET_NAME)_libretro.dll
-PSS_STYLE :=2
-LDFLAGS += -DLL
-CFLAGS += -D_CRT_SECURE_NO_DEPRECATE
-WINDOWS_VERSION=1
 
 else
    TARGET := $(TARGET_NAME)_libretro.dll
@@ -317,29 +124,21 @@ endif
 
 include Makefile.common
 
-# Ensure compiler variables are clean of any Makefile.common pollution
+# Hard-lock compiler variables for PS2 to prevent any pollution from Makefile.common
 ifeq ($(platform), ps2)
-    CC = mips64r5900el-ps2-elf-gcc
-    CXX = mips64r5900el-ps2-elf-g++
-    AR = mips64r5900el-ps2-elf-ar
+    CC  := mips64r5900el-ps2-elf-gcc
+    CXX := mips64r5900el-ps2-elf-g++
+    AR  := mips64r5900el-ps2-elf-ar
 endif
 
-ifneq (,$(findstring msvc,$(platform)))
-WARNINGS :=
-else
 WARNINGS := -Wall \
     -Wno-sign-compare \
     -Wno-unused-variable \
     -Wno-unused-function \
     -Wno-uninitialized \
     -Wno-error=overloaded-virtual
-endif
 
-ifeq ($(NO_GCC),1)
-   WARNINGS :=
-endif
-
-OBJECTS := $(SOURCES_CXX:.cpp=.o)$(SOURCES_C:.c=.o)
+OBJECTS := $(SOURCES_CXX:.cpp=.o) $(SOURCES_C:.c=.o)
 
 all: $(TARGET)
 
@@ -349,27 +148,28 @@ else
    FLAGS += -O0 -g -DDEBUG
 endif
 
-LDFLAGS += $(fpic)$(SHARED)
-FLAGS += $(fpic) $(NEW_GCC_FLAGS)$(INCFLAGS)
+LDFLAGS += $(fpic) $(SHARED)
+FLAGS += $(fpic) $(NEW_GCC_FLAGS) $(INCFLAGS)
 
-FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8$(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.31\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=931 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE)$(PLATFORM_DEFINES)
+FLAGS += $(ENDIANNESS_DEFINES) -DSIZEOF_DOUBLE=8 $(WARNINGS) -DMEDNAFEN_VERSION=\"0.9.31\" -DPACKAGE=\"mednafen\" -DMEDNAFEN_VERSION_NUMERIC=931 -DPSS_STYLE=1 -DMPC_FIXED_POINT $(CORE_DEFINE) -DSTDC_HEADERS -D__STDC_LIMIT_MACROS -D__LIBRETRO__ -D_LOW_ACCURACY_ $(EXTRA_INCLUDES) $(SOUND_DEFINE) $(PLATFORM_DEFINES)
 
-CXXFLAGS += $(FLAGS)
+CXXFLAGS += $(FLAGS) $(EXTRA_CXXFLAGS)
 CFLAGS   += $(FLAGS)
 
-$(TARGET):$(OBJECTS)
-ifeq ($(STATIC_LINKING), 1)$(AR) rcs $@ $(OBJECTS)
+$(TARGET): $(OBJECTS)
+ifeq ($(STATIC_LINKING), 1)
+	$(AR) rcs $@ $(OBJECTS)
 else
-	$(CXX) -o$@ $^$(LDFLAGS)
+	$(CXX) -o $@ $^ $(LDFLAGS)
 endif
 
 %.o: %.cpp
-	$(CXX)$(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 %.o: %.c
-	$(CC)$(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(TARGET)$(OBJECTS)
+	rm -f $(TARGET) $(OBJECTS)
 
 .PHONY: clean
