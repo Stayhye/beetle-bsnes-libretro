@@ -217,6 +217,19 @@ else ifeq ($(platform), psp1)
    AR = psp-ar$(EXE_EXT)
    FLAGS += -DPSP -G0
    STATIC_LINKING = 1
+# PS2
+else ifeq ($(platform), ps2)
+    TARGET := $(TARGET_NAME)_libretro_$(platform).a
+    CC = mips64r5900el-ps2-elf-gcc
+    CXX = mips64r5900el-ps2-elf-g++
+    AR = mips64r5900el-ps2-elf-ar
+    CFLAGS += -Os -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -fcommon
+    CXXFLAGS += -Os -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -fcommon
+    LDFLAGS += -Wl,--allow-multiple-definition
+    STATIC_LINKING = 1
+    STATIC_LINKING_LINK = 1
+    PLATFORM_DEFINES := -DPS2 -DVIDEO_ABGR1555 -DIOAPI_NO_64
+    FRONTEND_SUPPORTS_RGB565 = 0
 else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_libretro_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
