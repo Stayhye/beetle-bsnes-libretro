@@ -105,8 +105,9 @@ else ifeq ($(platform), ps2)
     CC = mips64r5900el-ps2-elf-gcc
     CXX = mips64r5900el-ps2-elf-g++
     AR = mips64r5900el-ps2-elf-ar
-    CFLAGS += -Os -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -fcommon -Wno-error=overloaded-virtual
-    CXXFLAGS += -Os -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -fcommon -Wno-error=overloaded-virtual
+    PS2SDK_INCS ?= -I$(PS2SDK)/ee/include -I$(PS2SDK)/common/include
+    CFLAGS += -Os -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -fcommon -Wno-error=overloaded-virtual $(PS2SDK_INCS)
+    CXXFLAGS += -Os -march=r5900 -mtune=r5900 -G0 -ffast-math -fomit-frame-pointer -DPS2 -DABGR1555 -fno-expensive-optimizations -fcommon -Wno-error=overloaded-virtual $(PS2SDK_INCS)
     LDFLAGS += -Wl,--allow-multiple-definition
     STATIC_LINKING = 1
     STATIC_LINKING_LINK = 1
