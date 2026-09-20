@@ -1,15 +1,28 @@
 include lib/nall/Makefile
 include lib/nall/Makefile-qt
-ui = ui_qt
+
+ifeq ($(platform),ps2)
+  ui = ui_dummy
+else
+  ui = ui_qt
+endif
 
 ################
 ### compiler ###
 ################
 
-c     := $(compiler)
-cpp   := $(subst cc,++,$(compiler))
-flags := -O3 -fomit-frame-pointer -Ilib
-link  :=
+ifneq ($(platform),ps2)
+  c     := $(compiler)
+  cpp   := $(subst cc,++,$(compiler))
+  flags := -O3 -fomit-frame-pointer -Ilib
+  link  :=
+else
+  # PlayStation 2 (EE) Toolchain Settings
+  c     := ee-gcc
+  cpp   := ee-g++
+  flags := -O3 -G0 -fomit-frame-pointer -Ilib -I$(PS2SDK)/common/include -I$(PS2SDK)/ee/include -I$(PS2SDK)/ports/include
+  link  := -L$(PS2SDK)/ee/lib -L$(PS2SDK)/ports/lib -lkernel
+endif
 
 # profile-guided instrumentation:
 # flags += -fprofile-generate
@@ -29,13 +42,13 @@ ifeq ($(platform),x)
   ruby += audio.alsa audio.openal audio.oss audio.pulseaudio audio.pulseaudiosimple audio.ao
   ruby += input.sdl input.x
 
-  link += $(if $(findstring audio.openal,$(ruby)),-lopenal)
+  link += $(if$(findstring audio.openal,$(ruby)),-lopenal)
 else ifeq ($(platform),osx)
   ruby := video.qtopengl video.qtraster
   ruby += audio.openal
   ruby += input.carbon
 
-  link += $(if $(findstring audio.openal,$(ruby)),-framework OpenAL)
+  link += $(if$(findstring audio.openal,$(ruby)),-framework OpenAL)
 else ifeq ($(platform),win)
   link += -mwindows -mthreads
 # link += -mconsole -mthreads
@@ -47,7 +60,11 @@ else ifeq ($(platform),win)
   ruby += audio.directsound
   ruby += input.rawinput input.directinput
 
-  link += $(if $(findstring audio.openal,$(ruby)),-lopenal32)
+  link += $(if$(findstring audio.openal,$(ruby)),-lopenal32)
+else ifeq ($(platform),ps2)
+  # PS2 multimedia backend (typically utilizing SDL or native GS/SPU2 wrappers)
+  ruby := video.sdl audio.sdl input.sdl
+  link += -lSDL -lSDL_mixer
 else
   unknown_platform: help;
 endif
@@ -89,28 +106,26 @@ objects += 21fx
 
 compile = \
   $(strip \
-    $(if $(filter %.c,$<), \
-      $(c) $(flags) $1 -c $< -o $@, \
-      $(if $(filter %.cpp,$<), \
-        $(cpp) $(flags) $1 -c $< -o $@ \
+    $(if $(filter \%.c,$<), \
+      $(c)$(flags) $1 -c$< -o $@, \$(if $(filter \%.cpp,$<), \
+        $(cpp)$(flags) $1 -c $< -o$@ \
       ) \
     ) \
   )
 
-%.o: $<; $(call compile)
+%.o: $<;$(call compile)
 
 all: build;
 
 include $(ui)/Makefile
-objects := $(patsubst %,obj/%.o,$(objects))
+objects := $(patsubst \%,obj/\%.o,$(objects))
 rubydef := $(foreach c,$(subst .,_,$(call strupper,$(ruby))),-D$c)
 
 #################
 ### libraries ###
 #################
 
-obj/ruby.o: lib/ruby/ruby.cpp $(call rwildcard,lib/ruby/*)
-	$(call compile,$(rubydef) $(rubyflags))
+obj/ruby.o: lib/ruby/ruby.cpp $(call rwildcard,lib/ruby/*)$(call compile,$(rubydef)$(rubyflags))
 obj/libco.o: lib/libco/libco.c lib/libco/*
 
 #################
@@ -191,37 +206,40 @@ obj/21fx.o        : chip/21fx/21fx.cpp chip/21fx/*
 
 build: ui_build $(objects)
 ifeq ($(platform),osx)
-	test -d ../bsnes.app || mkdir -p ../bsnes.app/Contents/MacOS
-	$(strip $(cpp) -o ../bsnes.app/Contents/MacOS/bsnes $(objects) $(link))
+    test -d ../bsnes.app || mkdir -p ../bsnes.app/Contents/MacOS
+    $(strip$(cpp) -o ../bsnes.app/Contents/MacOS/bsnes $(objects)$(link))
+else ifeq ($(platform),ps2)
+    $(strip$(cpp) -o ../bsnes.elf $(objects)$(link))
+    # Optional: generate ELF stripped or packed binary if desired
 else
-	$(strip $(cpp) -o ../bsnes $(objects) $(link))
+    $(strip$(cpp) -o ../bsnes $(objects)$(link))
 endif
 
 install:
-	install -D -m 755 ../bsnes $(DESTDIR)$(prefix)/bin/bsnes
-	install -D -m 644 data/bsnes.png $(DESTDIR)$(prefix)/share/pixmaps/bsnes.png
-	install -D -m 644 data/bsnes.desktop $(DESTDIR)$(prefix)/share/applications/bsnes.desktop
+    install -D -m 755 ../bsnes $(DESTDIR)$(prefix)/bin/bsnes
+    install -D -m 644 data/bsnes.png $(DESTDIR)$(prefix)/share/pixmaps/bsnes.png
+    install -D -m 644 data/bsnes.desktop $(DESTDIR)$(prefix)/share/applications/bsnes.desktop
 
 clean: ui_clean
-	-@$(call delete,obj/*.o)
-	-@$(call delete,*.res)
-	-@$(call delete,*.pgd)
-	-@$(call delete,*.pgc)
-	-@$(call delete,*.ilk)
-	-@$(call delete,*.pdb)
-	-@$(call delete,*.manifest)
+    -@$(call delete,obj/*.o)
+    -@$(call delete,*.res)
+    -@$(call delete,*.pgd)
+    -@$(call delete,*.pgc)
+    -@$(call delete,*.ilk)
+    -@$(call delete,*.pdb)
+    -@$(call delete,*.manifest)
 
 help:
-	@echo "Usage: $(MAKE) platform=(os) compiler=(cc) [options]"
-	@echo ""
-	@echo "Supported platforms:"
-	@echo "  x   - Linux / BSD (x86, x86-64)"
-	@echo "  win - Windows (x86, x86-64)"
-	@echo ""
-	@echo "Supported compilers:"
-	@echo "  gcc              - GCC compiler"
-	@echo "  mingw32-gcc      - MinGW compiler"
-	@echo "  i586-mingw32-gcc - MinGW cross compiler"
-	@echo ""
-	@echo "Example: $(MAKE) platform=x compiler=gcc"
-	@echo ""
+    @echo "Usage: $(MAKE) platform=(os) compiler=(cc) [options]"
+    @echo ""
+    @echo "Supported platforms:"
+    @echo "  x   - Linux / BSD (x86, x86-64)"
+    @echo "  win - Windows (x86, x86-64)"
+    @echo "  ps2 - PlayStation 2 (Emotion Engine)"
+    @echo ""
+    @echo "Supported compilers:"
+    @echo "  gcc            - GCC compiler"
+    @echo "  mingw32-gcc    - MinGW compiler"
+    @echo "  i586-mingw32-gcc - MinGW cross compiler"
+    @echo ""
+    @echo "Example: $(MAKE) platform=ps2"
