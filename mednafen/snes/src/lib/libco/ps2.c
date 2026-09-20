@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <kernel.h>
 
 /* Since cothread_t is a void pointer it must contain an address. We can't return a reference to a local variable
@@ -23,28 +24,34 @@ cothread_t co_create(unsigned int size, void (*entrypoint)(void))
    * new threads each with their own handle, so we create them on the heap instead and delete them manually when they're
    * no longer needed in co_delete().
    */
-  cothread_t handle = malloc(sizeof(cothread_t));
-  ee_thread_t thread;
+  cothread_t handle = malloc(sizeof(uint32_t));
+  if (!handle)
+      return NULL;
 
-  // u8 threadStack[size/8] __attribute__ ((aligned(16)));
   void *threadStack = (void *)malloc(size);
+  if (threadStack == NULL)
+  {
+      printf("libco: ERROR: creating threadStack\n");
+      free(handle);
+      return NULL;
+  }
 
-  if ( threadStack== NULL)
-	{
-		printf("libco: ERROR: creating threadStack\n");
-		return(-1);
-	}
-
-	thread.stack_size		= size;
-	thread.gp_reg			= &_gp;
-	thread.func				= (void *)entrypoint;
-	thread.stack			= threadStack;
-	thread.option			= 0;
-  thread.initial_priority = 1;
+  ee_thread_t thread;
+  thread.stack_size         = size;
+  thread.gp_reg             = &_gp;
+  thread.func               = (void *)entrypoint;
+  thread.stack              = threadStack;
+  thread.option             = 0;
+  thread.initial_priority   = 1;
 
   int32_t new_thread_id = CreateThread(&thread);
-	if (new_thread_id < 0)
-		printf("libco: ERROR: creating thread\n");
+  if (new_thread_id < 0)
+  {
+      printf("libco: ERROR: creating thread\n");
+      free(threadStack);
+      free(handle);
+      return NULL;
+  }
 
   StartThread(new_thread_id, NULL);
   *(uint32_t *)handle = new_thread_id;
@@ -53,8 +60,11 @@ cothread_t co_create(unsigned int size, void (*entrypoint)(void))
 
 void co_delete(cothread_t handle)
 {
+  if (!handle)
+      return;
+      
   TerminateThread(*(uint32_t *)handle);
-	DeleteThread(*(uint32_t *)handle);
+  DeleteThread(*(uint32_t *)handle);
   free(handle);
 }
 
