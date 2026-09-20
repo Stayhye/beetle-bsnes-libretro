@@ -317,6 +317,13 @@ endif
 
 include Makefile.common
 
+# Ensure compiler variables are clean of any Makefile.common pollution
+ifeq ($(platform), ps2)
+    CC = mips64r5900el-ps2-elf-gcc
+    CXX = mips64r5900el-ps2-elf-g++
+    AR = mips64r5900el-ps2-elf-ar
+endif
+
 ifneq (,$(findstring msvc,$(platform)))
 WARNINGS :=
 else
